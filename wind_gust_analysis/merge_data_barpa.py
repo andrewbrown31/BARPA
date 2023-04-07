@@ -12,15 +12,14 @@ import numpy as np
 import tqdm
 import netCDF4 as nc
 from merge_data import last_day_of_month, latlon_dist, load_stn_info, subset_era5, extract_era5_df, get_env_clusters
+from post_process_tracks import load_aws, return_drop_list
 from GadiClient import GadiClient
 
 def load_barra_env_wg10(fid):
 	barra_str = fid.split("_")[1]+"_"+fid.split("_")[2]
-	barra = xr.open_mfdataset("/g/data/cj37/BARRA/BARRA_R/v1/analysis/spec/wndgust10m/"+\
-                fid.split("_")[1][0:4] + "/" + fid.split("_")[1][4:6] + "/wndgust10m*" + fid.split("_")[1][0:6] + "*.nc",\
+	barra = xr.open_mfdataset("/g/data/cj37/BARRA/BARRA_R/v1/forecast/spec/max_wndgust10m/"+\
+                fid.split("_")[1][0:4] + "/" + fid.split("_")[1][4:6] + "/max_wndgust10m*" + fid.split("_")[1][0:6] + "*.nc",\
 		    combine="nested",concat_dim="time").sortby("time")
-	barra["wndgust10m"] = barra.wndgust10m.shift({"time":1}).pad(mode="edge")
-	barra = barra.resample({"time":"1D"}).max()
 	barra_lat = barra["latitude"].values
 	barra_lon = barra["longitude"].values
 	x,y = np.meshgrid(barra_lon,barra_lat)
@@ -31,10 +30,12 @@ def load_barpa_r_wg(fid):
 	barpa_str1 = fid.split("_")[1]
 	barpa_str2 = (dt.datetime.strptime(fid.split("_")[1],"%Y%m%d") - dt.timedelta(days=1)).strftime("%Y%m%d")
 
-	files1 = glob.glob("/g/data/tp28//ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
-	files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
+	files1 = glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp26/wndgust10m-pp26-BARPA-EASTAUS_12km*.nc")
+	files2 = glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp26/wndgust10m-pp26-BARPA-EASTAUS_12km*.nc")
 
-	barpa = xr.open_mfdataset(files2+files1).sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),dt.datetime.strptime(fid.split("_")[2],"%Y%m%d"))})
+	barpa = xr.open_mfdataset(files2+files1,combine="nested",concat_dim="time").drop_duplicates("time").sortby("time").\
+		sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d").replace(minute=10),\
+				  dt.datetime.strptime(fid.split("_")[2],"%Y%m%d") + dt.timedelta(days=1))})
 
 	barpa_lat = barpa["latitude"].values
 	barpa_lon = barpa["longitude"].values
@@ -44,12 +45,29 @@ def load_barpa_r_wg(fid):
 def load_barpa_env(fid):
 	barpa_str = fid.split("_")[1]+"_"+fid.split("_")[2]
 	barpa = xr.open_dataset("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_erai/barpa_erai_"+barpa_str+".nc", chunks={"time":16})
-	barpa["wg10"] = barpa.wg10.shift({"time":1}).pad(mode="edge")
-	barpa_dmax = barpa.resample({"time":"1D"}).max()
 	barpa_lat = barpa["lat"].values
 	barpa_lon = barpa["lon"].values
 	x,y = np.meshgrid(barpa_lon,barpa_lat)
-	return barpa, barpa_dmax, x, y
+	return barpa, x, y
+
+def load_barpac_m_lightning(fid):
+    
+	#Load 10-minute BARPAC-M data from /scratch. Also resample to hourly maximum.
+    
+	barpa_str1 = fid.split("_")[1]
+	barpa_str2 = (dt.datetime.strptime(fid.split("_")[1],"%Y%m%d") - dt.timedelta(days=1)).strftime("%Y%m%d")
+
+	files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
+	files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
+
+	barpa = xr.open_mfdataset(files2+files1,combine="nested",concat_dim="time").drop_duplicates("time").sortby("time")\
+		    .sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),\
+				       dt.datetime.strptime(fid.split("_")[2],"%Y%m%d") + dt.timedelta(days=1))})
+
+	barpa_lat = barpa["latitude"].values
+	barpa_lon = barpa["longitude"].values
+	x,y = np.meshgrid(barpa_lon,barpa_lat)
+	return barpa, x, y
 
 def load_barpac_m_wg(fid):
     
@@ -61,7 +79,9 @@ def load_barpac_m_wg(fid):
 	files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
 	files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
 
-	barpa = xr.open_mfdataset(files2+files1).sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),dt.datetime.strptime(fid.split("_")[2],"%Y%m%d"))})
+	barpa = xr.open_mfdataset(files2+files1)\
+		    .sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),\
+				       dt.datetime.strptime(fid.split("_")[2],"%Y%m%d") + dt.timedelta(days=1))})
 
 	barpa_lat = barpa["latitude"].values
 	barpa_lon = barpa["longitude"].values
@@ -111,81 +131,138 @@ def get_points(da, lsm, stn_lat, stn_lon, stn_id):
         
         return temp_df
 
-def load_tint_aws_barpa(fid, state, summary="max"):
+def add_rolling_mean(df,time_col="time",gust_col="wndgust10m",min_periods=6):
+    rolling=df.set_index(time_col).groupby("stn_id")[gust_col].rolling("4H",center=True,closed="both",min_periods=min_periods).mean()
+    df=pd.merge(df,rolling.rename("rolling_4hr_mean"),on=["stn_id",time_col])
+    df["wgr_4"] = df[gust_col] / df["rolling_4hr_mean"]
+    return df
+
+def extract_lightning_points(lightning, stn_lat, stn_lon, stn_list):
+
+	lon = lightning.lon.values
+	lat = lightning.lat.values
+	x, y = np.meshgrid(lon,lat)
+	df_out = pd.DataFrame()
+	for i in np.arange(len(stn_lat)):
+		dist_km = latlon_dist(stn_lat[i], stn_lon[i], y, x)
+		sliced = xr.where(dist_km<=50, lightning, np.nan)
+		temp = sliced.sum(("lat","lon")).Lightning_observed.to_dataframe()
+		temp["points"] = i
+		df_out = pd.concat([df_out,temp], axis=0)
+
+	for p in np.arange(len(stn_list)):
+		df_out.loc[df_out.points==p,"stn_id"] = stn_list[p]
+	df_out = df_out.drop("points",axis=1)
+
+	return df_out
+
+def load_lightning(fid):
+	yyyymmdd1 = fid.split("_")[1]
+	yyyymmdd2 = fid.split("_")[2]
+	start_t = dt.datetime(int(yyyymmdd1[0:4]), int(yyyymmdd1[4:6]), int(yyyymmdd1[6:8]))
+	end_t = dt.datetime(int(yyyymmdd2[0:4]), int(yyyymmdd2[4:6]), int(yyyymmdd2[6:8]))
+
+	f = xr.open_dataset("/g/data/eg3/ab4502/ExtremeWind/ad_data/lightning_1hr/lightning_AUS_0.25deg_1hr_"+yyyymmdd1[0:4]+".nc",\
+	    decode_times=False)
+	f = f.assign_coords(time=[dt.datetime(int(yyyymmdd1[0:4]),1,1,0) + dt.timedelta(hours=int(i)) for i in np.arange(len(f.time.values))]).\
+                sel({"time":slice(start_t,end_t.replace(hour=23))})
+	return f
+
+def barpac_stations(stn_info,domain):
+    
+    if domain=="m":
+        f = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/topog-BARPAC-M_km2p2.nc")
+    elif domain=="t":
+        f = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-T_km4p4/static/topog-BARPAC-T_km4p4.nc")
+    else:
+        raise ValueError("Domain must be m or t")
+        
+    
+    lon_bnds = [f.longitude.values.min(),f.longitude.values.max()]
+    lat_bnds = [f.latitude.values.min(),f.latitude.values.max()]    
+    
+    return stn_info.loc[(stn_info.lon >= lon_bnds[0]) & (stn_info.lon <= lon_bnds[1]) & (stn_info.lat >= lat_bnds[0]) & (stn_info.lat <= lat_bnds[1])]
+
+
+def load_tint_aws_barpa(fid, state):
 
 	#########################################################################
 	#   Observations							#
 	#########################################################################
 
-	if os.path.exists("/g/data/eg3/ab4502/TINTobjects/"+fid+"_aws.csv"):
+	#if os.path.exists("/g/data/eg3/ab4502/TINTobjects/"+fid+"_aws.csv"):
 		#Load the AWS one-minute gust data with TINT storm object ID within 10 and 20 km
-		tint_df = pd.read_csv("/g/data/eg3/ab4502/TINTobjects/"+fid+"_aws.csv")
-		tint_df["dt_utc"] = pd.DatetimeIndex(tint_df.dt_utc)
-		tint_df["day"] = tint_df.dt_utc.dt.floor("D")
-		stn_list = np.sort(tint_df.stn_id.unique())
-	else:
-		print(fid + "_aws.csv does not extist")
-		return
+	#	tint_df = pd.read_csv("/g/data/eg3/ab4502/TINTobjects/"+fid+"_aws.csv")
+	#	tint_df["dt_utc"] = pd.DatetimeIndex(tint_df.dt_utc)
+	#	tint_df["hour"] = tint_df.dt_utc.dt.floor("H")
+	#	stn_list = np.sort(tint_df.stn_id.unique())
+	#else:
+	#	print(fid + "_aws.csv does not extist")
+	#	return
+	
+	#Instead of loading just the TINT-processed AWS data, load all the AWS data for a particular state.
+	domain="m"
+	year=fid.split("_")[1][0:4]
+	stn_info = barpac_stations(load_stn_info(state),domain)
+	stn_info = stn_info.loc[np.in1d(stn_info.stn_no,return_drop_list(state),invert=True)]
+	aws = load_aws(state, year)
+	aws = aws[aws["q"]=="Y"]
+	aws = aws[np.in1d(aws.stn_id,stn_info.stn_no)].drop(columns=["dt_utc","q","dt_lt"])
+
+	#Resample to 10-minute maximum to align with BARPA
+	aws = aws.groupby("stn_id")[["gust"]].resample("10Min",closed="right",label="right").max()
 
 	#Calculate the 4-hour wind gust ratio, for our SCW definition
+	#rolling4 = \
+	#    tint_df[["gust","stn_id","dt_utc"]].set_index(tint_df.dt_utc).groupby("stn_id").gust.rolling("4H",center=True,closed="both",min_periods=60).mean()
+	#rolling4.name = "rolling4"
+	#tint_df = pd.merge(tint_df,rolling4,on=["stn_id","dt_utc"])
+	#tint_df["wgr_4"] = tint_df["gust"] / tint_df["rolling4"]
 	rolling4 = \
-	    tint_df[["gust","stn_id","dt_utc"]].set_index(tint_df.dt_utc).groupby("stn_id").gust.rolling("4H",center=True,closed="both",min_periods=60).mean()
+	    aws.reset_index(0).groupby("stn_id").gust.rolling("4H",center=True,closed="both",min_periods=6).mean()
 	rolling4.name = "rolling4"
-	tint_df = pd.merge(tint_df,rolling4,on=["stn_id","dt_utc"])
-	tint_df["wgr_4"] = tint_df["gust"] / tint_df["rolling4"]
+	aws = pd.concat([aws,rolling4],axis=1)
+	aws["wgr_4"] = aws["gust"] / aws["rolling4"]
 
 	#Resample the one-minute AWS dataframe to daily maxima.
 	#This is done by sorting the dataframe, such that
 	#   1) SCWs are retained if they occur on a given day
 	#   2) After that, the strongest gust is retained
-	tint_df["scw"] = (tint_df["wgr_4"] >= 2) & (tint_df["in10km"]) & (tint_df["gust"]>=25) * 1
-	dmax = tint_df.sort_values(["stn_id","day","scw","gust"])[["stn_id","day","dt_utc","gust","in10km","wgr_4","scw"]].groupby(["stn_id","day"]).last()
-	dmax["dt_floor_6H"] = dmax.dt_utc.dt.floor("6H")
-	dmax["dt_floor_1H"] = dmax.dt_utc.dt.floor("1H")
+	#tint_df["scw"] = (tint_df["wgr_4"] >= 2) & (tint_df["in10km"]) & (tint_df["gust"]>=25) * 1
+	#tint_df["dt_floor_6H"] = tint_df.dt_utc.dt.floor("6H")
+	#tint_df["dt_floor_1H"] = tint_df.dt_utc.dt.floor("1H")
+	#hmax = tint_df.sort_values(["stn_id","dt_floor_1H","scw","gust"])[["stn_id","dt_floor_1H","dt_floor_6H","dt_utc","gust","in10km","wgr_4","scw"]].\
+	#		groupby(["stn_id","dt_floor_1H"]).last()
+
+	#Resample to daily max
+	aws["dt_floor_1D"] = aws.index.get_level_values(1).floor("1D")
+	#aws_dmax = aws.sort_values(["dt_floor_1D","gust"]).groupby(["stn_id","dt_floor_1D"]).last()
 
 	#Load AWS station information
-	stn_info = load_stn_info(state)
+	stn_list = np.unique(aws.index.get_level_values(0))
 	stn_latlon = stn_info.set_index("stn_no").loc[stn_list][["lat","lon"]].values
 	stn_lat = stn_latlon[:,0]; stn_lon = stn_latlon[:,1]
 
+
 	#########################################################################
-	#   BARPA (12 km)							#
+	#   BARPA-R convective diagnostics (12 km)				#
 	#########################################################################
 
 	#Load BARPA 12 km environmental diagnostics
-	barpa_env, barpa_dmax_env, x_env, y_env = load_barpa_env(fid)
+	barpa_env, x_env, y_env = load_barpa_env(fid)
 
 	#Subset to within 50 km
 	barpa_subset_env, rad_lats_env, rad_lons_env = subset_era5(barpa_env, stn_lat, stn_lon, y_env, x_env)
-	barpa_dmax_subset_env, rad_lats_env, rad_lons_env = subset_era5(barpa_dmax_env, stn_lat, stn_lon, y_env, x_env)
 
 	#Mask ocean
 	barpa_env_lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc").\
 			    interp({"latitude":barpa_subset_env.lat, "longitude":barpa_subset_env.lon}, method="nearest").lnd_mask.values
 	barpa_subset_env = xr.where(barpa_env_lsm, barpa_subset_env, np.nan).persist()
-	barpa_dmax_subset_env = xr.where(barpa_env_lsm, barpa_dmax_subset_env, np.nan).persist()
 
 	#Get dataframe from the BARPA data
 	barpa_df_env = extract_era5_df(barpa_subset_env, rad_lats_env, rad_lons_env, stn_list,"max")
-	barpa_dmax_df_env = extract_era5_df(barpa_dmax_subset_env, rad_lats_env, rad_lons_env, stn_list,"max")
-
-	#Get point data for the model wind gust (no radial max), and merge
-	barpa_df_env_point = get_points(barpa_subset_env.wg10, barpa_env_lsm, stn_lat, stn_lon, stn_list).rename(columns={"wg10":"wg10_12km_point"})
-	barpa_dmax_df_env_point = get_points(barpa_dmax_subset_env.wg10, barpa_env_lsm, stn_lat, stn_lon, stn_list).rename(columns={"wg10":"wg10_12km_point_dmax"})
-	#barpa_df_env_point["time"] = barpa_df_env_point.time.dt.floor("1D")
-	barpa_df_env = pd.merge(barpa_df_env.rename(columns={"wg10":"wg10_12km_rad"}), barpa_df_env_point, on=["time","stn_id"])
-	barpa_dmax_df_env = pd.merge(barpa_dmax_df_env.rename(columns={"wg10":"wg10_12km_rad_dmax"}), barpa_dmax_df_env_point, on=["time","stn_id"])
-		#		[["time","wg10_12km_rad_dmax","stn_id","lat","lon","wg10_12km_point_dmax"]]
-
-	#Merge the daily and sub-daily data
-	barpa_df_env["day"] = barpa_df_env["time"].dt.floor("1D")
-	barpa_df_env = pd.merge(\
-			barpa_dmax_df_env.drop(columns=["lat","lon"]),\
-			barpa_df_env.drop(columns=["lat","lon"]),\
-		    left_on=["time","stn_id"], right_on=["day","stn_id"],suffixes=["_dmax",""]).rename(columns={"time":"barpa_env_time"}).drop(columns=["time_dmax"])
 
 	#Load clustering classification model saved by ~/working/observations/tint_processing/auto_case_driver/kmeans_and_cluster_eval.ipynb
-	#TODO: this code works but currently just uses the daily maximum data. Ideally need to do this sub-daily
 	#Order = [1,2,0] for clusters = [strong bg wind, steep lapse rate, high moisture]
 	cluster_mod, cluster_input = get_env_clusters()
 	input_df = (barpa_df_env[["s06","qmean01","lr13","Umean06"]]\
@@ -193,79 +270,170 @@ def load_tint_aws_barpa(fid, state, summary="max"):
 	    / (cluster_input.max(axis=0) - \
 	       cluster_input.min(axis=0))
 	barpa_df_env["cluster"] = cluster_mod.predict(input_df)
-	input_df = (barpa_df_env[["s06_dmax","qmean01_dmax","lr13_dmax","Umean06_dmax"]]\
-		   - cluster_input.min(axis=0))\
-	    / (cluster_input.max(axis=0) - \
-	       cluster_input.min(axis=0))
-	barpa_df_env["cluster_dmax"] = cluster_mod.predict(input_df)
+
+	#########################################################################
+	#   BARPA-R wind gust (12 km)						#
+	#########################################################################
+
+	#Load 12 km wind gusts
+	barpa_r_wg, barpa_r_wg_x, barpa_r_wg_y = load_barpa_r_wg(fid)
+	barpa_r_wg = barpa_r_wg.rename({"longitude":"lon","latitude":"lat"})
+
+	#Subset to within 50 km
+	barpa_subset_r_wg, rad_lats_r_wg, rad_lons_r_wg = subset_era5(barpa_r_wg, stn_lat, stn_lon, barpa_r_wg_y, barpa_r_wg_x, r=50)
+
+	#Mask ocean
+	barpa_r_wg_lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc").\
+                            interp({"latitude":barpa_subset_r_wg.lat, "longitude":barpa_subset_r_wg.lon}, method="nearest").lnd_mask.values
+	barpa_subset_r_wg = xr.where(barpa_r_wg_lsm, barpa_subset_r_wg.wndgust10m, np.nan).persist()
+
+	#Get dataframe from the BARPA data (50 km radius)
+	barpa_df_r_wg = extract_era5_df(barpa_subset_r_wg, rad_lats_r_wg, rad_lons_r_wg, stn_list,"max")
+
+	#Get dataframe for the closet land point
+	barpa_df_r_wg_point = get_points(barpa_subset_r_wg, barpa_r_wg_lsm, stn_lat, stn_lon, stn_list)
+
+	#Round to nearest 10 min
+	barpa_df_r_wg["time"] = barpa_df_r_wg.time.round("Min")
+	barpa_df_r_wg_point["time"] = barpa_df_r_wg_point.time.round("Min")
 
 	#########################################################################
 	#   BARPA (2.2 km)							#
 	#########################################################################
 
 	#Put in a check for BARPA data
-	isbarpa_m = len(glob.glob("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/era/erai/historical/r0/pp_unified/daily/sfcWindGustmax/0p02deg/"+\
-                fid.split("_")[1][0:4]+"/sfcWindGustmax_BARPAC-M_km2p2_erai_historical_r0_BARPAC_daily_"+fid.split("_")[1]+"*.nc")) > 0
+	isbarpa_m = len(glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+\
+                fid.split("_")[1][0:4]+"*")) > 0
 	if isbarpa_m:
 
 		#Load the BARPA 2.2 km wind gusts
-		barpa_wg, x_wg, y_wg = load_barpa_wg(fid)
+		barpa_wg, x_wg, y_wg = load_barpac_m_wg(fid)
+		barpa_wg = barpa_wg.rename({"longitude":"lon","latitude":"lat"})
+		barpa_wg = barpa_wg.assign_coords({"time":barpa_wg.time_bnds.values[:,1]})
 
 		#Subset to within r km
-		barpa_subset_wg, rad_lats_wg, rad_lons_wg = subset_era5(barpa_wg, stn_lat, stn_lon, y_wg, x_wg, r=10)
+		barpa_subset_wg, rad_lats_wg, rad_lons_wg = subset_era5(barpa_wg, stn_lat, stn_lon, y_wg, x_wg, r=50)
 
 		#Mask ocean
 		barpa_wg_lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc").\
 				    interp({"latitude":barpa_subset_wg.lat, "longitude":barpa_subset_wg.lon}, method="nearest").lnd_mask.values
-		barpa_subset_wg = xr.where(barpa_wg_lsm, barpa_subset_wg.sfcWindGustmax, np.nan).persist()
+		barpa_subset_wg = xr.where(barpa_wg_lsm, barpa_subset_wg.max_wndgust10m, np.nan).persist()
 
 		#Get dataframe from the BARPA data
 		barpa_df_wg = extract_era5_df(barpa_subset_wg, rad_lats_wg, rad_lons_wg, stn_list,"max")
-		barpa_df_wg["time"] = barpa_df_wg.time.dt.floor("1D")
+		#barpa_df_wg["time"] = barpa_df_wg.time.dt.floor("1D")
 
 		#Get dataframe using the closest point function. Merge them with the other dataframes
-		barpa_df_wg_point = get_points(barpa_subset_wg, barpa_wg_lsm, stn_lat, stn_lon, stn_list).rename(columns={"sfcWindGustmax":"wg10_2p2_point"}).\
-					    drop(columns="height")
-		barpa_df_wg_point["time"] = barpa_df_wg_point.time.dt.floor("1D")
-		barpa_df_wg = pd.merge(barpa_df_wg.rename(columns={"sfcWindGustmax":"wg10_2p2_rad"}), barpa_df_wg_point, on=["time","stn_id"])
+		barpa_df_wg_point = get_points(barpa_subset_wg, barpa_wg_lsm, stn_lat, stn_lon, stn_list)
+		#barpa_df_wg_point["time"] = barpa_df_wg_point.time.dt.floor("1D")
+		#barpa_df_wg = pd.merge(barpa_df_wg.rename(columns={"sfcWindGustmax":"wg10_2p2_rad"}), barpa_df_wg_point, on=["time","stn_id"])
+
+		#Round to nearest 10 min
+		barpa_df_wg["time"] = barpa_df_wg.time.round("Min")
+		barpa_df_wg_point["time"] = barpa_df_wg_point.time.round("Min")
 
 	#########################################################################
 	#   BARRA (12 km)							#
 	#########################################################################
 
-	barra_wg, x_barra, y_barra = load_barra_env_wg10(fid)
-	barra_wg = barra_wg.rename({"latitude":"lat","longitude":"lon"})
-	barra_lsm = xr.open_dataset("/g/data/cj37/BARRA/BARRA_R/v1/static/lnd_mask-an-slv-PT0H-BARRA_R-v1.nc").lnd_mask
+	#barra_wg, x_barra, y_barra = load_barra_env_wg10(fid)
+	#barra_wg = barra_wg.rename({"latitude":"lat","longitude":"lon"}).drop_vars(["time_bnds"]).drop_dims("bnds")
+	#barra_lsm = xr.open_dataset("/g/data/cj37/BARRA/BARRA_R/v1/static/lnd_mask-an-slv-PT0H-BARRA_R-v1.nc").lnd_mask
 
 	#Subset to within 50 km
-	barra_subset_wg, rad_lats_env, rad_lons_env = subset_era5(barra_wg, stn_lat, stn_lon, y_barra, x_barra)
-	barra_subset_wg = xr.where(barra_lsm.sel({"longitude":barra_subset_wg.lon,"latitude":barra_subset_wg.lat}), barra_subset_wg, np.nan).persist()
-	barra_df_wg = extract_era5_df(barra_subset_wg, rad_lats_env, rad_lons_env, stn_list,"max")
+	#barra_subset_wg, rad_lats_env, rad_lons_env = subset_era5(barra_wg, stn_lat, stn_lon, y_barra, x_barra)
+	#barra_subset_wg = xr.where(barra_lsm.sel({"longitude":barra_subset_wg.lon,"latitude":barra_subset_wg.lat}), barra_subset_wg, np.nan).persist()
+	#barra_df_wg = extract_era5_df(barra_subset_wg, rad_lats_env, rad_lons_env, stn_list,"max")
 	
-	barra_df_wg10_point = get_points(barra_wg.wndgust10m,\
-		    barra_lsm.values, stn_lat, stn_lon, stn_list).rename(columns={"wndgust10m":"wg10_barra_12km_point"}).\
-			drop(columns=["forecast_period","height"])
+	#barra_df_wg10_point = get_points(barra_wg.max_wndgust10m,\
+		    #barra_lsm.values, stn_lat, stn_lon, stn_list)
 
-	barra_df_wg = pd.merge(barra_df_wg.rename(columns={"wndgust10m":"wg10_barra_12km_rad"}), barra_df_wg10_point)
+	#########################################################################
+	#   Observed lightning							#
+	#########################################################################
+	#year = int(fid.split("_")[1][0:4])
+	if (int(year) >= 2005) & (int(year) <= 2020):
+		obs_lightning = load_lightning(fid)
+		obs_lightning_df = extract_lightning_points(obs_lightning, stn_lat, stn_lon, stn_list).reset_index()
+		dmax_obs_lightning = obs_lightning_df.groupby("stn_id").resample("1D",on="time")[["Lightning_observed"]].sum()
+	else:
+		print("NOTE THAT LIGHTNING DATA IS NOT AVAILABLE FOR THIS YEAR")
+
+	#########################################################################
+	#   BARPA lightning							#
+	#########################################################################
+	if isbarpa_m:
+		barpa_lightning,x_barpa_lightning,y_barpa_lightning = load_barpac_m_lightning(fid)
+		barpa_lightning = barpa_lightning.rename({"longitude":"lon","latitude":"lat"}).drop_vars(["time_bnds"]).drop_dims("bnds")
+
+		#Subset to within r km
+		barpa_subset_lightning, rad_lats_lightning, rad_lons_lightning = \
+			subset_era5(barpa_lightning, stn_lat, stn_lon, y_barpa_lightning, x_barpa_lightning, r=50)
+
+		#Get dataframe from the BARPA data
+		barpa_df_lightning = extract_era5_df(barpa_subset_lightning, rad_lats_lightning, rad_lons_lightning, stn_list,"sum")
+		barpa_df_lightning["time"] = barpa_df_lightning.time.dt.floor("1D")
 
 	#########################################################################
 	#   Merge together							#
 	#########################################################################
 
-	#Merge the two barpa dfs
-	if isbarpa_m:
-		#barpa = pd.merge(barpa_df_wg, barpa_df_env, on=["time","stn_id"])
-		barpa = pd.merge(\
-				barpa_df_wg[["time","stn_id","wg10_2p2_rad","wg10_2p2_point"]],\
-				barpa_df_env,\
-			    left_on=["time","stn_id"],right_on=["day","stn_id"])
-	else:
-		barpa = barpa_df_env
-		barpa["wg10_2p2_rad"] = np.nan
-		barpa["wg10_2p2_point"] = np.nan
-	#merged = pd.merge(dmax, barpa, left_index=True, right_on=["stn_id","time"])
-	merged = pd.merge(dmax, barpa, left_on=["dt_floor_6H","stn_id"], right_on=["barpa_env_time","stn_id"])
-	merged = pd.merge(merged, barra_df_wg, on=["stn_id","time"])
+	# OBS: hmax
+	# BARPA-R: barpa_df_env, barpa_df_r_wg, barpa_df_r_wg_point
+	# BARPAC-M: barpa_df_wg, barpa_df_wg_point
+	# BARRA-R: barra_df_wg, barra_df_wg10_point
+
+	#TODO: Currently using BARPA-R data that may not be a 10-minute max (may be instantaneous)
+
+	#Merge the hourly max obs with the 6-hourly barpa environmental data
+	aws["dt_floor_6H"] = aws.index.get_level_values(1).floor("6H")
+	merged = pd.merge(aws.reset_index(), barpa_df_env, left_on=["stn_id","dt_floor_6H"], right_on=["stn_id","time"], how="inner").set_index(["stn_id","dt_utc"])
+
+	#Resample and calculate WGR: BARPA-R
+	#barpa_df_r_wg_resample = add_rolling_mean(barpa_df_r_wg,gust_col="wndgust10m").sort_values("wndgust10m").groupby("stn_id").\
+				    #resample("1H",on="time",closed="right",loffset=dt.timedelta(hours=1)).last().\
+				    #drop(columns=["forecast_period","forecast_reference_time","height","stn_id","rolling_4hr_mean"]).\
+				    #rename(columns={"wndgust10m":"barpa_r_rad_50km","wgr_4":"wgr_barpa_r_rad_50km"})
+	barpa_df_r_wg_resample = add_rolling_mean(barpa_df_r_wg,gust_col="wndgust10m").\
+				    drop(columns=["forecast_period","forecast_reference_time","height","rolling_4hr_mean"]).\
+				    rename(columns={"wndgust10m":"wg10_12km_rad","wgr_4":"wgr_12km_rad"})
+	barpa_df_r_wg_point_resample = add_rolling_mean(barpa_df_r_wg_point,gust_col="wndgust10m").\
+				    drop(columns=["lat","lon","forecast_period","forecast_reference_time","height","rolling_4hr_mean"]).\
+				    rename(columns={"wndgust10m":"wg10_12km_point","wgr_4":"wgr_12km_point"})
+
+	#Resample and calculate WGR: BARPAC-M
+	barpa_df_wg_resample = add_rolling_mean(barpa_df_wg,gust_col="max_wndgust10m").\
+				    drop(columns=["forecast_period","forecast_reference_time","height","rolling_4hr_mean"]).\
+				    rename(columns={"max_wndgust10m":"wg10_2p2km_rad","wgr_4":"wgr_2p2km_rad"})
+	barpa_df_wg_point_resample = add_rolling_mean(barpa_df_wg_point,gust_col="max_wndgust10m").\
+				    drop(columns=["forecast_period","forecast_reference_time","height","rolling_4hr_mean","lat","lon"]).\
+				    rename(columns={"max_wndgust10m":"wg10_2p2km_point","wgr_4":"wgr_2p2km_point"})
+
+	#Resample and calculate WGR: BARRA-R
+	#barra_df_wg_resample = add_rolling_mean(barra_df_wg,gust_col="max_wndgust10m",min_periods=2).sort_values("max_wndgust10m").groupby("stn_id").\
+	#			    resample("1H",on="time",closed="right",loffset=dt.timedelta(hours=1)).last().\
+	#			    drop(columns=["latitude_longitude","height","stn_id","rolling_4hr_mean"]).\
+	#			    rename(columns={"max_wndgust10m":"barra_r_rad_50km","wgr_4":"wgr_barra_r_rad_50km"})
+	#barra_df_wg_point_resample = add_rolling_mean(barra_df_wg10_point,gust_col="max_wndgust10m",min_periods=2).sort_values("max_wndgust10m").groupby("stn_id").\
+	#			    resample("1H",on="time",closed="right",loffset=dt.timedelta(hours=1)).last().\
+	#			    drop(columns=["lat","lon","forecast_period","forecast_reference_time","height","stn_id","rolling_4hr_mean"]).\
+	#			    rename(columns={"max_wndgust10m":"barra_r_point","wgr_4":"wgr_barra_r_point"})
+
+	merged = pd.concat([merged,\
+			    barpa_df_r_wg_resample.set_index(["stn_id","time"]),\
+			    barpa_df_r_wg_point_resample.set_index(["stn_id","time"]),\
+			    barpa_df_wg_resample.set_index(["stn_id","time"]),\
+			    barpa_df_wg_point_resample.set_index(["stn_id","time"])],axis=1,join="inner")
+
+	#Add hourly observed lightning
+	#merged = pd.concat([merged,obs_lightning_df.set_index(["stn_id","time"]).rename(columns={"Lightning_observed":"Lightning_observed_hourly"})],axis=1,join="inner")
+
+	#Add daily max BARPA/observed lightning
+	dmax_lightning_merged = pd.concat([barpa_df_lightning.set_index(["stn_id","time"]).drop(columns=["latitude_longitude","forecast_period","forecast_reference_time"]),
+					    dmax_obs_lightning],axis=1,join="inner")
+	merged = pd.merge(merged,dmax_lightning_merged.rename(columns={"Lightning_observed":"Lightning_observed_daily"}),
+		    left_on=["stn_id","dt_floor_1D"],right_index=True,how="inner")
+
 
 	return merged
 
@@ -288,27 +456,27 @@ if __name__ == "__main__":
 
 	while date1.year <= end_year:
 		date2 = last_day_of_month(date1)
-		fid1 = date1.strftime("%Y%m%d")
-		fid2 = date2.strftime("%Y%m%d")
-		fid = rid+"_"+fid1+"_"+fid2
-		print(fid1)
+		if (date1.month in [12,1,2]) & (date1 < dt.datetime(2015,3,1)):
+			fid1 = date1.strftime("%Y%m%d")
+			fid2 = date2.strftime("%Y%m%d")
+			fid = rid+"_"+fid1+"_"+fid2
+			print(fid1)
 
-		output_df = pd.concat([output_df,load_tint_aws_barpa(fid, state, summary="max")],axis=0)
+			output_df = pd.concat([output_df,load_tint_aws_barpa(fid, state)],axis=0)
 
 		date1 = date2 + dt.timedelta(days=1)
 
-	output_df.to_csv("/g/data/eg3/ab4502/ExtremeWind/points/barpa_barra_aws_"+rid+".csv")
+	output_df.to_csv("/g/data/eg3/ab4502/ExtremeWind/points/barpac_m_aws_"+state+".csv")
 
 	#Notes on df columns
-	# -> gust: measured daily max AWS gust speed (in10km if convective, SCW if severe convective gust)
-	# -> wg10_barra_12km_rad: BARRA 10 m gust in 50 km radius around AWS
-	# -> wg10_barra_12km_point: BARRA 10 m gust at closest point to AWS
-	# -> wg10_12km_rad: 6-hourly BARPA-EASTAUS 10 m gust in 50 km radius around AWS
-	# -> wg10_12km_point: 6-hourly BARPA-EASTAUS 10 m gust at closest point to AWS
-	# -> wg10_12km_rad_dmax: Daily maximum BARPA-EASTAUS 10 m gust in 50 km radius around AWS
-	# -> wg10_12km_point_dmax: Daily maximum BARPA-EASTAUS 10 m gust at closest point to AWS
-	# -> wg10_2p2_rad: BARPA-M 10 m gust in 10 km radius around AWS
-	# -> wg10_2p2_point: BARPA-M 10 m gust at closest point to AWS
+	# -> gust: measured 10-min max AWS gust speed
+	# -> wg10_12km_rad: 10-min BARPA-EASTAUS 10 m gust in 50 km radius around AWS
+	# -> wg10_12km_point: 10-min max BARPA-EASTAUS 10 m gust at closest point to AWS
+	# -> wg10_2p2_rad: 10-min max BARPAC gust in 10 km radius around AWS
+	# -> wg10_2p2_point: 10-min max BARPAC 10 m gust at closest point to AWS
+	# -> wgr_*: Ratio of 10-min max gust to the rolling 4-hour mean 
+
+	# -> n_lightning_fl: Sum of BARPAC lightning flashes in all grid points within 50 km of AWS on the same day as the gust
+	# -> Lightning_observed_daily: Sum of observed WWLLN lightning flashes in all grid points within 50 km of AWS on the same day as the gust
 
 	# -> *convective_diagnostic*: A set of convective diagnostics from 12 km BARPA data, at the previous 6-hourly time step before the observed gust
-	# -> *convective_diagnostic*_dmax: Daily maximum convective diagnostics from 12 km BARPA data
