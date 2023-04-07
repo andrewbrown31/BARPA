@@ -24,7 +24,7 @@ def file_dates(files, query, day_delta=10):
 
 	is_in = []
 	for i in np.arange(len(files)):
-		t = dt.datetime.strptime(files[i].split("/")[11][:-1], "%Y%m%dT%H%M")
+		t = dt.datetime.strptime(files[i].split("/")[12][:-1], "%Y%m%dT%H%M")
 		t_list = date_seq([t + dt.timedelta(hours=6), t + dt.timedelta(days=day_delta)], "hours", 6) 
 		if any(np.in1d(query, t_list)):
 			is_in.append(True)
@@ -33,7 +33,7 @@ def file_dates(files, query, day_delta=10):
 	return is_in
 
 
-def read_barpa(domain, time, experiment, forcing_mdl, ensemble):
+def read_barpa(domain, time, experiment, experiment2, forcing_mdl, ensemble):
 
 	#NOTE: Data has been set to zero for below surface pressure.
 	#But wrf_parallel doesn't use these levels anyway
@@ -44,41 +44,41 @@ def read_barpa(domain, time, experiment, forcing_mdl, ensemble):
 	query_dates = date_seq(time, "hours", 6)
 
 	#Get a list of all BARPA files in the du7 directory, for a given experiment/forcing model
-	geopt_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	geopt_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp2/geop_ht_uv*"))
-	hus_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	hus_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp2/spec_hum*"))
-	ta_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	ta_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp2/air_temp*"))
-	ua_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	ua_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp2/wnd_ucmp*"))
-	va_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	va_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp2/wnd_vcmp*"))
-	huss_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	huss_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/qsair_scrn*"))
-	dewpt_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	dewpt_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp26/dewpt_scrn*"))
-	tas_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	tas_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/temp_scrn*"))
-	uas_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	uas_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/uwnd10m_b*"))
-	vas_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	vas_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/vwnd10m_b*"))
-	ps_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	ps_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp26/sfc_pres*"))
-	wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+\
+	wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp26/wndgust10m*"))
 
 	#Get the files that we need
@@ -204,7 +204,7 @@ def read_barpa(domain, time, experiment, forcing_mdl, ensemble):
 	hur[hur>100] = 100
 
 	#Load terrain data
-	terrain = xr.open_dataset("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/static/topog-BARPA-EASTAUS_12km.nc").\
+	terrain = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/topog-BARPA-EASTAUS_12km.nc").\
 		sel({"latitude":lats, "longitude":lons})["topog"].values
 
 	#Get lat/lon
@@ -247,7 +247,7 @@ def to_points_loop_erai(loc_id,points,fname,start_year,end_year,variables=False)
 
 	df = pd.DataFrame()
 
-	lsm = xr.open_dataset("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
+	lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
 	temp = xr.open_dataset(glob.glob("/g/data/eg3/ab4502/ExtremeWind/aus/"+\
 			"barpa_erai/barpa_erai_199001*")[0])
 	lsm = lsm.interp({"latitude":temp.lat, "longitude":temp.lon}, method="nearest")
@@ -312,7 +312,7 @@ def create_gust_threshold_barpac(start_year, end_year, driving_mdl, thresh=25):
                               dates.append(dt.datetime(y,m,1,12,0,0))
         last_date = dt.datetime(y+1,1,1,12,0,0)
 
-        lsm = xr.open_dataset("/g/data/du7/barpa/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
+        lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
 
         output = np.zeros(lsm.lnd_mask.shape)
         days = 0
@@ -329,9 +329,9 @@ def create_gust_threshold_barpac(start_year, end_year, driving_mdl, thresh=25):
                 except:
                     query_dates = date_seq([dates[t], last_date+dt.timedelta(days=-1)], "hours", 24)
                 if driving_mdl == "erai":
-                        wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPAC-M_km2p2/era/erai/r0/*/*/pp0/max_wndgust10m*.nc"))
+                        wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/era/erai/r0/*/*/pp0/max_wndgust10m*.nc"))
                 elif driving_mdl == "ACCESS1-0":
-                        wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPAC-M_km2p2/cmip5/ACCESS1-0/r1i1p1/*/*/pp0/max_wndgust10m*.nc"))
+                        wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/cmip5/ACCESS1-0/r1i1p1/*/*/pp0/max_wndgust10m*.nc"))
                 wg_files = wg_files[file_dates(wg_files, query_dates)]
                 f = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested")).sel({"time":query_dates})
 
@@ -360,7 +360,7 @@ def to_points_wind_gust_barpac_erai(loc_id, points, fname, start_year, end_year)
 
         df = pd.DataFrame()
 
-        lsm = xr.open_dataset("/g/data/du7/barpa/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
+        lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
 
         #Read netcdf data
         for t in np.arange(len(dates)):
@@ -372,7 +372,7 @@ def to_points_wind_gust_barpac_erai(loc_id, points, fname, start_year, end_year)
                             query_dates = date_seq([dates[t], dates[t+1]+dt.timedelta(days=-1)], "hours", 24)
                 except:
                     query_dates = date_seq([dates[t], last_date+dt.timedelta(days=-1)], "hours", 24)
-                wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPAC-M_km2p2/era/erai/r0/*/*/pp0/max_wndgust10m*.nc"))
+                wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/era/erai/r0/*/*/pp0/max_wndgust10m*.nc"))
                 wg_files = wg_files[file_dates(wg_files, query_dates)]
                 f = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested")).sel({"time":query_dates})
 
@@ -427,7 +427,7 @@ def to_points_wind_gust_barpac_access(loc_id, points, fname, start_year, end_yea
 
         df = pd.DataFrame()
 
-        lsm = xr.open_dataset("/g/data/du7/barpa/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
+        lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
 
         #Read netcdf data
         for t in np.arange(len(dates)):
@@ -439,7 +439,7 @@ def to_points_wind_gust_barpac_access(loc_id, points, fname, start_year, end_yea
                             query_dates = date_seq([dates[t], dates[t+1]+dt.timedelta(days=-1)], "hours", 24)
                 except:
                     query_dates = date_seq([dates[t], last_date+dt.timedelta(days=-1)], "hours", 24)
-                wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPAC-M_km2p2/cmip5/ACCESS1-0/r1i1p1/*/*/pp0/max_wndgust10m*.nc"))
+                wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/cmip5/ACCESS1-0/r1i1p1/*/*/pp0/max_wndgust10m*.nc"))
                 wg_files = wg_files[file_dates(wg_files, query_dates)]
                 f = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested")).sel({"time":query_dates})
 
@@ -516,7 +516,7 @@ def to_points_wind_gust_access(loc_id, points, fname, start_year, end_year):
 
         df = pd.DataFrame()
 
-        lsm = xr.open_dataset("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
+        lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
 
         #Read netcdf data
         for t in np.arange(len(dates)):
@@ -525,7 +525,7 @@ def to_points_wind_gust_access(loc_id, points, fname, start_year, end_year):
                     query_dates = date_seq([dates[t], dates[t+1]+dt.timedelta(days=-1)], "hours", 24)
                 except:
                     query_dates = date_seq([dates[t], last_date+dt.timedelta(days=-1)], "hours", 24)
-                wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/cmip5/ACCESS1-0/r1i1p1/*/*/pp0/max_wndgust10m*.nc"))
+                wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/cmip5/ACCESS1-0/r1i1p1/*/*/pp0/max_wndgust10m*.nc"))
                 wg_files = wg_files[file_dates(wg_files, query_dates)]
                 f = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested", drop_variables=["realization"])).sel({"time":query_dates})
 
@@ -584,7 +584,7 @@ def to_points_wind_gust(loc_id, points, fname, start_year, end_year):
 
         df = pd.DataFrame()
 
-        lsm = xr.open_dataset("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
+        lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
 
         #Read netcdf data
         for t in np.arange(len(dates)):
@@ -593,7 +593,7 @@ def to_points_wind_gust(loc_id, points, fname, start_year, end_year):
                     query_dates = date_seq([dates[t], dates[t+1]+dt.timedelta(days=-1)], "hours", 24)
                 except:
                     query_dates = date_seq([dates[t], last_date+dt.timedelta(days=-1)], "hours", 24)
-                wg_files = np.sort(glob.glob("/g/data/du7/barpa/trials/BARPA-EASTAUS_12km/era/erai/r0/*/*/pp0/max_wndgust10m*.nc"))
+                wg_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/era/erai/r0/*/*/pp0/max_wndgust10m*.nc"))
                 wg_files = wg_files[file_dates(wg_files, query_dates)]
                 f = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested")).sel({"time":query_dates})
 

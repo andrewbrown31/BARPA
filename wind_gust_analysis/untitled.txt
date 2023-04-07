@@ -1,0 +1,8 @@
+BARPA plan:
+
+-> Load in the observed SCW dataset for radar locations inside the BARPAC-M domain (hourly occurrences)
+-> Load in hourly maximum wind gusts from:
+    . BARPAC-M
+    . BARPA-R
+    . BARRA-R
+-> Load in 6-hourly convective diagnostics from BARPA-R
