@@ -11,4 +11,4 @@
 module use /g/data/hh5/public/modules
 module load conda/analysis3
 
-python working/BARPA/wind_gust_analysis/merge_data_barpa_2.py -start_year 2005 -rid 0 -state vic
+python working/BARPA/wind_gust_analysis/merge_data_barpa.py -start_year 2005 -rid 0 -state vic

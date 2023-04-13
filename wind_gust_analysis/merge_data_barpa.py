@@ -190,16 +190,6 @@ def load_tint_aws_barpa(fid, state):
 	#   Observations							#
 	#########################################################################
 
-	#if os.path.exists("/g/data/eg3/ab4502/TINTobjects/"+fid+"_aws.csv"):
-		#Load the AWS one-minute gust data with TINT storm object ID within 10 and 20 km
-	#	tint_df = pd.read_csv("/g/data/eg3/ab4502/TINTobjects/"+fid+"_aws.csv")
-	#	tint_df["dt_utc"] = pd.DatetimeIndex(tint_df.dt_utc)
-	#	tint_df["hour"] = tint_df.dt_utc.dt.floor("H")
-	#	stn_list = np.sort(tint_df.stn_id.unique())
-	#else:
-	#	print(fid + "_aws.csv does not extist")
-	#	return
-	
 	#Instead of loading just the TINT-processed AWS data, load all the AWS data for a particular state.
 	domain="m"
 	year=fid.split("_")[1][0:4]
@@ -213,30 +203,14 @@ def load_tint_aws_barpa(fid, state):
 	aws = aws.groupby("stn_id")[["gust"]].resample("10Min",closed="right",label="right").max()
 
 	#Calculate the 4-hour wind gust ratio, for our SCW definition
-	#rolling4 = \
-	#    tint_df[["gust","stn_id","dt_utc"]].set_index(tint_df.dt_utc).groupby("stn_id").gust.rolling("4H",center=True,closed="both",min_periods=60).mean()
-	#rolling4.name = "rolling4"
-	#tint_df = pd.merge(tint_df,rolling4,on=["stn_id","dt_utc"])
-	#tint_df["wgr_4"] = tint_df["gust"] / tint_df["rolling4"]
 	rolling4 = \
 	    aws.reset_index(0).groupby("stn_id").gust.rolling("4H",center=True,closed="both",min_periods=6).mean()
 	rolling4.name = "rolling4"
 	aws = pd.concat([aws,rolling4],axis=1)
 	aws["wgr_4"] = aws["gust"] / aws["rolling4"]
 
-	#Resample the one-minute AWS dataframe to daily maxima.
-	#This is done by sorting the dataframe, such that
-	#   1) SCWs are retained if they occur on a given day
-	#   2) After that, the strongest gust is retained
-	#tint_df["scw"] = (tint_df["wgr_4"] >= 2) & (tint_df["in10km"]) & (tint_df["gust"]>=25) * 1
-	#tint_df["dt_floor_6H"] = tint_df.dt_utc.dt.floor("6H")
-	#tint_df["dt_floor_1H"] = tint_df.dt_utc.dt.floor("1H")
-	#hmax = tint_df.sort_values(["stn_id","dt_floor_1H","scw","gust"])[["stn_id","dt_floor_1H","dt_floor_6H","dt_utc","gust","in10km","wgr_4","scw"]].\
-	#		groupby(["stn_id","dt_floor_1H"]).last()
-
 	#Resample to daily max
 	aws["dt_floor_1D"] = aws.index.get_level_values(1).floor("1D")
-	#aws_dmax = aws.sort_values(["dt_floor_1D","gust"]).groupby(["stn_id","dt_floor_1D"]).last()
 
 	#Load AWS station information
 	stn_list = np.unique(aws.index.get_level_values(0))
@@ -325,33 +299,14 @@ def load_tint_aws_barpa(fid, state):
 
 		#Get dataframe using the closest point function. Merge them with the other dataframes
 		barpa_df_wg_point = get_points(barpa_subset_wg, barpa_wg_lsm, stn_lat, stn_lon, stn_list)
-		#barpa_df_wg_point["time"] = barpa_df_wg_point.time.dt.floor("1D")
-		#barpa_df_wg = pd.merge(barpa_df_wg.rename(columns={"sfcWindGustmax":"wg10_2p2_rad"}), barpa_df_wg_point, on=["time","stn_id"])
 
 		#Round to nearest 10 min
 		barpa_df_wg["time"] = barpa_df_wg.time.round("Min")
 		barpa_df_wg_point["time"] = barpa_df_wg_point.time.round("Min")
 
 	#########################################################################
-	#   BARRA (12 km)							#
-	#########################################################################
-
-	#barra_wg, x_barra, y_barra = load_barra_env_wg10(fid)
-	#barra_wg = barra_wg.rename({"latitude":"lat","longitude":"lon"}).drop_vars(["time_bnds"]).drop_dims("bnds")
-	#barra_lsm = xr.open_dataset("/g/data/cj37/BARRA/BARRA_R/v1/static/lnd_mask-an-slv-PT0H-BARRA_R-v1.nc").lnd_mask
-
-	#Subset to within 50 km
-	#barra_subset_wg, rad_lats_env, rad_lons_env = subset_era5(barra_wg, stn_lat, stn_lon, y_barra, x_barra)
-	#barra_subset_wg = xr.where(barra_lsm.sel({"longitude":barra_subset_wg.lon,"latitude":barra_subset_wg.lat}), barra_subset_wg, np.nan).persist()
-	#barra_df_wg = extract_era5_df(barra_subset_wg, rad_lats_env, rad_lons_env, stn_list,"max")
-	
-	#barra_df_wg10_point = get_points(barra_wg.max_wndgust10m,\
-		    #barra_lsm.values, stn_lat, stn_lon, stn_list)
-
-	#########################################################################
 	#   Observed lightning							#
 	#########################################################################
-	#year = int(fid.split("_")[1][0:4])
 	if (int(year) >= 2005) & (int(year) <= 2020):
 		obs_lightning = load_lightning(fid)
 		obs_lightning_df = extract_lightning_points(obs_lightning, stn_lat, stn_lon, stn_list).reset_index()
@@ -383,17 +338,11 @@ def load_tint_aws_barpa(fid, state):
 	# BARPAC-M: barpa_df_wg, barpa_df_wg_point
 	# BARRA-R: barra_df_wg, barra_df_wg10_point
 
-	#TODO: Currently using BARPA-R data that may not be a 10-minute max (may be instantaneous)
-
 	#Merge the hourly max obs with the 6-hourly barpa environmental data
 	aws["dt_floor_6H"] = aws.index.get_level_values(1).floor("6H")
 	merged = pd.merge(aws.reset_index(), barpa_df_env, left_on=["stn_id","dt_floor_6H"], right_on=["stn_id","time"], how="inner").set_index(["stn_id","dt_utc"])
 
 	#Resample and calculate WGR: BARPA-R
-	#barpa_df_r_wg_resample = add_rolling_mean(barpa_df_r_wg,gust_col="wndgust10m").sort_values("wndgust10m").groupby("stn_id").\
-				    #resample("1H",on="time",closed="right",loffset=dt.timedelta(hours=1)).last().\
-				    #drop(columns=["forecast_period","forecast_reference_time","height","stn_id","rolling_4hr_mean"]).\
-				    #rename(columns={"wndgust10m":"barpa_r_rad_50km","wgr_4":"wgr_barpa_r_rad_50km"})
 	barpa_df_r_wg_resample = add_rolling_mean(barpa_df_r_wg,gust_col="wndgust10m").\
 				    drop(columns=["forecast_period","forecast_reference_time","height","rolling_4hr_mean"]).\
 				    rename(columns={"wndgust10m":"wg10_12km_rad","wgr_4":"wgr_12km_rad"})
@@ -409,24 +358,11 @@ def load_tint_aws_barpa(fid, state):
 				    drop(columns=["forecast_period","forecast_reference_time","height","rolling_4hr_mean","lat","lon"]).\
 				    rename(columns={"max_wndgust10m":"wg10_2p2km_point","wgr_4":"wgr_2p2km_point"})
 
-	#Resample and calculate WGR: BARRA-R
-	#barra_df_wg_resample = add_rolling_mean(barra_df_wg,gust_col="max_wndgust10m",min_periods=2).sort_values("max_wndgust10m").groupby("stn_id").\
-	#			    resample("1H",on="time",closed="right",loffset=dt.timedelta(hours=1)).last().\
-	#			    drop(columns=["latitude_longitude","height","stn_id","rolling_4hr_mean"]).\
-	#			    rename(columns={"max_wndgust10m":"barra_r_rad_50km","wgr_4":"wgr_barra_r_rad_50km"})
-	#barra_df_wg_point_resample = add_rolling_mean(barra_df_wg10_point,gust_col="max_wndgust10m",min_periods=2).sort_values("max_wndgust10m").groupby("stn_id").\
-	#			    resample("1H",on="time",closed="right",loffset=dt.timedelta(hours=1)).last().\
-	#			    drop(columns=["lat","lon","forecast_period","forecast_reference_time","height","stn_id","rolling_4hr_mean"]).\
-	#			    rename(columns={"max_wndgust10m":"barra_r_point","wgr_4":"wgr_barra_r_point"})
-
 	merged = pd.concat([merged,\
 			    barpa_df_r_wg_resample.set_index(["stn_id","time"]),\
 			    barpa_df_r_wg_point_resample.set_index(["stn_id","time"]),\
 			    barpa_df_wg_resample.set_index(["stn_id","time"]),\
 			    barpa_df_wg_point_resample.set_index(["stn_id","time"])],axis=1,join="inner")
-
-	#Add hourly observed lightning
-	#merged = pd.concat([merged,obs_lightning_df.set_index(["stn_id","time"]).rename(columns={"Lightning_observed":"Lightning_observed_hourly"})],axis=1,join="inner")
 
 	#Add daily max BARPA/observed lightning
 	dmax_lightning_merged = pd.concat([barpa_df_lightning.set_index(["stn_id","time"]).drop(columns=["latitude_longitude","forecast_period","forecast_reference_time"]),
