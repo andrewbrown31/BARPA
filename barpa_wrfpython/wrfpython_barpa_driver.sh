@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in $(seq 1990 5 2005); do
+for i in $(seq 2005 5 2015); do
  
  let j=i+5
 

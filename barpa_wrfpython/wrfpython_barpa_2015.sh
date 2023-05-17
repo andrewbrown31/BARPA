@@ -2,7 +2,7 @@
 
 #PBS -P eg3 
 #PBS -q normal
-#PBS -l walltime=12:00:00,mem=128GB 
+#PBS -l walltime=48:00:00,mem=128GB 
 #PBS -l ncpus=1
 #PBS -o /home/548/ab4502/working/ExtremeWind/jobs/messages/barpa_wrf_python_2015.o 
 #PBS -e /home/548/ab4502/working/ExtremeWind/jobs/messages/barpa_wrf_python_2015.e 
@@ -14,7 +14,7 @@ source activate wrfpython3.6
 #Initialise date
 d=2015-01-01
 #Specify end date
-while [ "$d" != 2016-01-01 ]; do
+while [ "$d" != 2020-01-01 ]; do
 
   start_time=$(date -d "$d" +%Y%m%d)"00"
   end_time=$(date -d "$d + 1 month - 1 day"  +%Y%m%d)"18"

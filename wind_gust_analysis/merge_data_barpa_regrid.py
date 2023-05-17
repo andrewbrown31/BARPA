@@ -2,6 +2,7 @@ import os
 from sklearn.cluster import KMeans as kmeans
 import argparse
 import joblib
+from GadiClient import GadiClient
 import xarray as xr
 import glob
 import pandas as pd
@@ -13,28 +14,6 @@ import netCDF4 as nc
 from merge_data import last_day_of_month, latlon_dist, load_stn_info, subset_era5, extract_era5_df, get_env_clusters
 from post_process_tracks import load_aws, return_drop_list
 from GadiClient import GadiClient
-import xesmf
-
-def get_regridder(fine_mod,coarse_mod,v):
-
-	#Using xesmf, define a regridder object using conservative interpolation. This will be used to regrid the 
-	# BARPAC data to barpa_r
-
-	regrid_lon = coarse_mod.isel(time=0).sel(lon=slice(fine_mod.lon.min(),fine_mod.lon.max()),
-                lat=slice(fine_mod.lat.min(),fine_mod.lat.max())).lon
-	regrid_lat = coarse_mod.isel(time=0).sel(lon=slice(fine_mod.lon.min(),fine_mod.lon.max()),
-			lat=slice(fine_mod.lat.min(),fine_mod.lat.max())).lat
-
-	ds_out = xr.Dataset(
-	    {
-		"lat": (["lat"], regrid_lat.values, {"units": "degrees_north"}),
-		"lon": (["lon"], regrid_lon.values, {"units": "degrees_east"}),
-	    }
-	)
-
-	regridder = xesmf.Regridder(fine_mod.isel(time=0)[v],ds_out,method="conservative")
-
-	return regridder
 
 def load_erai_wg10(fid):
 
@@ -230,7 +209,7 @@ def barpac_stations(stn_info,domain):
     return stn_info.loc[(stn_info.lon >= lon_bnds[0]) & (stn_info.lon <= lon_bnds[1]) & (stn_info.lat >= lat_bnds[0]) & (stn_info.lat <= lat_bnds[1])]
 
 
-def load_tint_aws_barpa(fid, state, interp="None"):
+def load_tint_aws_barpa(fid, state):
 
 	#########################################################################
 	#   Observations							#
@@ -327,7 +306,7 @@ def load_tint_aws_barpa(fid, state, interp="None"):
 	barpa_r_wg, barpa_r_wg_x, barpa_r_wg_y = load_barpa_r_wg(fid)
 	barpa_r_wg = barpa_r_wg.rename({"longitude":"lon","latitude":"lat"})
 
-	#Subset to within 50 km
+	#Subset to points within 50 km of each station location
 	barpa_subset_r_wg, rad_lats_r_wg, rad_lons_r_wg = subset_era5(barpa_r_wg, stn_lat, stn_lon, barpa_r_wg_y, barpa_r_wg_x, r=50)
 
 	#Mask ocean
@@ -371,22 +350,13 @@ def load_tint_aws_barpa(fid, state, interp="None"):
 		barpa_wg, x_wg, y_wg = load_barpac_m_wg(fid)
 		barpa_wg = barpa_wg.rename({"longitude":"lon","latitude":"lat"})
 		barpa_wg = barpa_wg.assign_coords({"time":barpa_wg.time_bnds.values[:,1]})
-		print("Original shape: ",barpa_wg.max_wndgust10m.shape)
-		if interp == "barpa_r":
-			print("INFO: INTERPOLATING BARPAC-M GRID TO BARPA-R")
-			regridder = get_regridder(barpa_wg, barpa_r_wg, "max_wndgust10m")
-			barpa_wg = regridder(barpa_wg)
-			x_wg,y_wg = np.meshgrid(barpa_wg["lon"].values,barpa_wg["lat"].values)
-			barpa_wg_lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/static/lnd_mask-BARPA-EASTAUS_12km.nc")
-		else:
-			barpa_wg_lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc")
-		print("New shape: ",barpa_wg.max_wndgust10m.shape)
 
 		#Subset to within r km
 		barpa_subset_wg, rad_lats_wg, rad_lons_wg = subset_era5(barpa_wg, stn_lat, stn_lon, y_wg, x_wg, r=50)
 
 		#Mask ocean
-		barpa_wg_lsm = barpa_wg_lsm.interp({"latitude":barpa_subset_wg.lat, "longitude":barpa_subset_wg.lon}, method="nearest").lnd_mask.values
+		barpa_wg_lsm = xr.open_dataset("/g/data/tp28/BARPA/trials/BARPAC-M_km2p2/static/lnd_mask-BARPAC-M_km2p2.nc").\
+				    interp({"latitude":barpa_subset_wg.lat, "longitude":barpa_subset_wg.lon}, method="nearest").lnd_mask.values
 		barpa_subset_wg = xr.where(barpa_wg_lsm, barpa_subset_wg.max_wndgust10m, np.nan).persist()
 
 		#Get dataframe from the BARPA data
@@ -484,9 +454,6 @@ if __name__ == "__main__":
 	rid = args.rid
 	state = args.state
 
-	client = GadiClient()
-
-	interp = "barpa_r"
 	end_year = 2015
 	date1 = dt.datetime(int(start_year), 1, 1)
 
@@ -500,14 +467,11 @@ if __name__ == "__main__":
 			fid = rid+"_"+fid1+"_"+fid2
 			print(fid1)
 
-			output_df = pd.concat([output_df,load_tint_aws_barpa(fid, state, interp)],axis=0)
+			output_df = pd.concat([output_df,load_tint_aws_barpa(fid, state)],axis=0)
 
 		date1 = date2 + dt.timedelta(days=1)
 
-	if interp == "barpa_r":
-		output_df.to_csv("/g/data/eg3/ab4502/ExtremeWind/points/barpac_m_aws_"+state+"_barpa_r_interp.csv")
-	else:
-		output_df.to_csv("/g/data/eg3/ab4502/ExtremeWind/points/barpac_m_aws_"+state+".csv")
+	output_df.to_csv("/g/data/eg3/ab4502/ExtremeWind/points/barpac_m_aws_"+state+".csv")
 
 	#Notes on df columns
 	# -> gust: measured 10-min max AWS gust speed
