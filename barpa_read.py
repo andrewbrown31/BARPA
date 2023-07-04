@@ -62,9 +62,6 @@ def read_barpa(domain, time, experiment, experiment2, forcing_mdl, ensemble):
 	huss_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
 		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/qsair_scrn*"))
-	dewpt_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
-		    experiment+"/"+forcing_mdl+"/"+experiment2+\
-		    "/"+ensemble+"/*/*/pp26/dewpt_scrn*"))
 	tas_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
 		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/temp_scrn*"))
@@ -74,6 +71,9 @@ def read_barpa(domain, time, experiment, experiment2, forcing_mdl, ensemble):
 	vas_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
 		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp3/vwnd10m_b*"))
+	dewpt_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
+		    experiment+"/"+forcing_mdl+"/"+experiment2+\
+		    "/"+ensemble+"/*/*/pp26/dewpt_scrn*"))
 	ps_files = np.sort(glob.glob("/g/data/tp28/BARPA/trials/BARPA-EASTAUS_12km/"+\
 		    experiment+"/"+forcing_mdl+"/"+experiment2+\
 		    "/"+ensemble+"/*/*/pp26/sfc_pres*"))
@@ -88,10 +88,10 @@ def read_barpa(domain, time, experiment, experiment2, forcing_mdl, ensemble):
 	ua_files = ua_files[file_dates(ua_files, query_dates)]
 	va_files = va_files[file_dates(va_files, query_dates)]
 	huss_files = huss_files[file_dates(huss_files, query_dates)]
-	dewpt_files = dewpt_files[file_dates(dewpt_files, query_dates)]
 	tas_files = tas_files[file_dates(tas_files, query_dates)]
 	uas_files = uas_files[file_dates(uas_files, query_dates)]
 	vas_files = vas_files[file_dates(vas_files, query_dates)]
+	dewpt_files = dewpt_files[file_dates(dewpt_files, query_dates)]
 	ps_files = ps_files[file_dates(ps_files, query_dates)]
 	wg_files = wg_files[file_dates(wg_files, query_dates)]
 
@@ -103,12 +103,17 @@ def read_barpa(domain, time, experiment, experiment2, forcing_mdl, ensemble):
 	ua_ds = drop_duplicates(xr.open_mfdataset(ua_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#m/s
 	va_ds = drop_duplicates(xr.open_mfdataset(va_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#m/s
 	huss_ds = drop_duplicates(xr.open_mfdataset(huss_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#kg/kg
-	dewpt_ds = drop_duplicates(xr.open_mfdataset(dewpt_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#K
 	tas_ds = drop_duplicates(xr.open_mfdataset(tas_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#K
 	uas_ds = drop_duplicates(xr.open_mfdataset(uas_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#m/s
 	vas_ds = drop_duplicates(xr.open_mfdataset(vas_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#m/s
-	ps_ds = drop_duplicates(xr.open_mfdataset(ps_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#Pa
-	wg_ds = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#m/s
+	try:
+		dewpt_ds = drop_duplicates(xr.open_mfdataset(dewpt_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#K
+		ps_ds = drop_duplicates(xr.open_mfdataset(ps_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#Pa
+		wg_ds = drop_duplicates(xr.open_mfdataset(wg_files, concat_dim="time", combine="nested", drop_variables=["realization"]))	#m/s
+		pp26 = True
+	except:
+		print("NO PP26 DATA...SETTING TO NAN")
+		pp26 = False
 
 	#Slice to query times, spatial domain, convert to dataarray, restrict to below 100 hPa
 	lons = slice(domain[2], domain[3])
@@ -119,31 +124,44 @@ def read_barpa(domain, time, experiment, experiment2, forcing_mdl, ensemble):
 	ua_da = ua_ds.sel({"time":query_dates, "pressure":geopt_ds["pressure"]>= 100, "latitude":lats, "longitude":lons})["wnd_ucmp_uv"]
 	va_da = va_ds.sel({"time":query_dates, "pressure":geopt_ds["pressure"]>= 100, "latitude":lats, "longitude":lons})["wnd_vcmp_uv"]
 	huss_da = huss_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["qsair_scrn"]
-	dewpt_da = dewpt_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["dewpt_scrn"]
 	tas_da = tas_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["temp_scrn"]
 	uas_da = uas_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["uwnd10m_b"]
 	vas_da = vas_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["vwnd10m_b"]
-	ps_da = ps_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["sfc_pres"]
-	wg_da = wg_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["wndgust10m"]
+	if pp26:
+		dewpt_da = dewpt_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["dewpt_scrn"]
+		ps_da = ps_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["sfc_pres"]
+		wg_da = wg_ds.sel({"time":query_dates, "latitude":lats, "longitude":lons})["wndgust10m"]
 
 	#As in read_cmip, make sure that all data arrays have the same times (take the union of the set of times).
 	#If one of the dataarrays goes to size=0 on the time dimension, throw an error
-	common_dates = np.array(list(set(hus_da.time.values) & set(ta_da.time.values) & set(ua_da.time.values)\
-                 & set(va_da.time.values) & set(huss_da.time.values) & set(tas_da.time.values)\
-                 & set(uas_da.time.values) & set(vas_da.time.values) & set(ps_da.time.values)\
-		 & set(geopt_da.time.values) & set(wg_da.time.values) & set(dewpt_da.time.values)))
+	if pp26:
+		common_dates = np.array(list(set(hus_da.time.values) & set(ta_da.time.values) & set(ua_da.time.values)\
+			 & set(va_da.time.values) & set(huss_da.time.values) & set(tas_da.time.values)\
+			 & set(uas_da.time.values) & set(vas_da.time.values) & set(ps_da.time.values)\
+			 & set(geopt_da.time.values) & set(wg_da.time.values) & set(dewpt_da.time.values)))
+	else:
+		common_dates = np.array(list(set(hus_da.time.values) & set(ta_da.time.values) & set(ua_da.time.values)\
+			 & set(va_da.time.values) & set(huss_da.time.values) & set(tas_da.time.values)\
+			 & set(uas_da.time.values) & set(vas_da.time.values)\
+			 & set(geopt_da.time.values)))
 	geopt_da = geopt_da.isel({"time":np.in1d(geopt_da.time, common_dates)})
 	hus_da = hus_da.isel({"time":np.in1d(hus_da.time, common_dates)})
 	ta_da = ta_da.isel({"time":np.in1d(ta_da.time, common_dates)})
 	ua_da = ua_da.isel({"time":np.in1d(ua_da.time, common_dates)})
 	va_da = va_da.isel({"time":np.in1d(va_da.time, common_dates)})
 	huss_da = huss_da.isel({"time":np.in1d(huss_da.time, common_dates)})
-	dewpt_da = dewpt_da.isel({"time":np.in1d(dewpt_da.time, common_dates)})
 	tas_da = tas_da.isel({"time":np.in1d(tas_da.time, common_dates)})
 	uas_da = uas_da.isel({"time":np.in1d(uas_da.time, common_dates)})
 	vas_da = vas_da.isel({"time":np.in1d(vas_da.time, common_dates)})
-	ps_da = ps_da.isel({"time":np.in1d(ps_da.time, common_dates)})
-	wg_da = wg_da.isel({"time":np.in1d(wg_da.time, common_dates)})
+	if pp26:
+		dewpt_da = dewpt_da.isel({"time":np.in1d(dewpt_da.time, common_dates)})
+		ps_da = ps_da.isel({"time":np.in1d(ps_da.time, common_dates)})
+		wg_da = wg_da.isel({"time":np.in1d(wg_da.time, common_dates)})
+	else:
+		dewpt_da = (huss_da * np.nan).rename("dewpt_scrn")
+		ps_da = (huss_da * np.nan).rename("sfc_pres")
+		wg_da = (huss_da * np.nan).rename("wndgust10m")
+
 	for da in [geopt_da, hus_da, ta_da, ua_da, va_da, huss_da, dewpt_da, tas_da, uas_da, vas_da, ps_da, wg_da]:
 		if len(da.time.values) == 0:
 			varname=da.attrs["standard_name"]
