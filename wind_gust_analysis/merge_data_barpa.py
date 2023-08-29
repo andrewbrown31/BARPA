@@ -96,15 +96,18 @@ def load_barpa_env(fid):
 	x,y = np.meshgrid(barpa_lon,barpa_lat)
 	return barpa, x, y
 
-def load_barpac_m_lightning(fid):
+def load_barpac_m_lightning(fid,model,forcing,experiment,ensemble):
     
 	#Load 10-minute BARPAC-M data from /scratch. Also resample to hourly maximum.
     
 	barpa_str1 = fid.split("_")[1]
 	barpa_str2 = (dt.datetime.strptime(fid.split("_")[1],"%Y%m%d") - dt.timedelta(days=1)).strftime("%Y%m%d")
 
-	files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
-	files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
+	#files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
+	#files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
+
+	files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/"+model+"/"+forcing+"/"+experiment+"/"+ensemble+"/*/"+barpa_str1[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
+	files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/"+model+"/"+forcing+"/"+experiment+"/"+ensemble+"/*/"+barpa_str2[0:6]+"*/pp0/n_lightning_fl-pp0-BARPAC-M_km2p2-*.nc")
 
 	barpa = xr.open_mfdataset(files2+files1,combine="nested",concat_dim="time").drop_duplicates("time").sortby("time")\
 		    .sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),\
@@ -115,19 +118,35 @@ def load_barpac_m_lightning(fid):
 	x,y = np.meshgrid(barpa_lon,barpa_lat)
 	return barpa, x, y
 
-def load_barpac_m_wg(fid):
+def load_barpac_m_wg(fid,model,forcing,experiment,ensemble):
     
 	#Load 10-minute BARPAC-M data from /scratch. Also resample to hourly maximum.
     
 	barpa_str1 = fid.split("_")[1]
 	barpa_str2 = (dt.datetime.strptime(fid.split("_")[1],"%Y%m%d") - dt.timedelta(days=1)).strftime("%Y%m%d")
 
-	files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str1[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
-	files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/era/erai/historical/r0/*/"+barpa_str2[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
+	if ((dt.datetime.strptime(fid.split("_")[1],"%Y%m%d") < dt.datetime(2004,12,1)) & (model=="era")) |\
+		((forcing=="ACCESS1-0") & (experiment=="rcp85")):
+		print("loading from eg3")
+		#If using the ERA-forced data from 2005 or previous, try and load from my directory
+		files1 = glob.glob("/scratch/eg3/ab4502/BARPAC-M_km2p2/"+model+"/"+forcing+"/"+experiment+"/"+ensemble+"/max_wndgust10m-pp26-BARPAC-M_km2p2-"+barpa_str1[0:6]+"*.nc")
+		files2 = glob.glob("/scratch/eg3/ab4502/BARPAC-M_km2p2/"+model+"/"+forcing+"/"+experiment+"/"+ensemble+"/max_wndgust10m-pp26-BARPAC-M_km2p2-"+barpa_str2[0:6]+"*.nc")
 
-	barpa = xr.open_mfdataset(files2+files1)\
-		    .sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),\
-				       dt.datetime.strptime(fid.split("_")[2],"%Y%m%d") + dt.timedelta(days=1))})
+		barpa = xr.open_mfdataset(files2+files1)\
+			    .sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),\
+					       dt.datetime.strptime(fid.split("_")[2],"%Y%m%d") + dt.timedelta(days=1))})
+
+	else:
+		print("loading from tp28")
+		#For post-2005 ERA-forced data, or ACCESS-forced data, use Christian's directory
+		files1 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/"+model+"/"+forcing+"/"+experiment+"/"+ensemble+"/*/"+barpa_str1[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
+		files2 = glob.glob("/scratch/tp28/cst565/ESCI/BARPAC-M_km2p2/"+model+"/"+forcing+"/"+experiment+"/"+ensemble+"/*/"+barpa_str2[0:6]+"*/pp26/max_wndgust10m-pp26-BARPAC-M_km2p2-*.nc")
+
+		barpa = xr.open_mfdataset(files2+files1)\
+			    .sel({"time":slice(dt.datetime.strptime(fid.split("_")[1],"%Y%m%d"),\
+					       dt.datetime.strptime(fid.split("_")[2],"%Y%m%d") + dt.timedelta(days=1))})
+		if barpa.time.size==0:
+			raise ValueError("LOADED FROM /SCRATCH/TP28, BUT THERE IS NO DATA HERE")
 
 	barpa_lat = barpa["latitude"].values
 	barpa_lon = barpa["longitude"].values
@@ -368,7 +387,7 @@ def load_tint_aws_barpa(fid, state, interp="None"):
 	if isbarpa_m:
 
 		#Load the BARPA 2.2 km wind gusts
-		barpa_wg, x_wg, y_wg = load_barpac_m_wg(fid)
+		barpa_wg, x_wg, y_wg = load_barpac_m_wg(fid,"era","erai","historical","r0")
 		barpa_wg = barpa_wg.rename({"longitude":"lon","latitude":"lat"})
 		barpa_wg = barpa_wg.assign_coords({"time":barpa_wg.time_bnds.values[:,1]})
 		print("Original shape: ",barpa_wg.max_wndgust10m.shape)
