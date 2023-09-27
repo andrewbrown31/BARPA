@@ -72,8 +72,9 @@ if __name__ == "__main__":
 			f_env = np.unique(["/g/data/eg3/ab4502/ExtremeWind/aus/barpa_erai/barpa_erai_"+pd.to_datetime(fid.split("_")[1]).strftime("%Y%m")+"*.nc",\
 					"/g/data/eg3/ab4502/ExtremeWind/aus/barpa_erai/barpa_erai_"+(pd.to_datetime(fid.split("_")[2])+dt.timedelta(days=1)).strftime("%Y%m")+"*.nc"])
 		env_ds = []
+		var = ["lr13","qmean01","Umean06","s06","bdsd","convgust_dry","gustex","wg10"]
 		for fname in f_env:
-			env_ds.append(xr.open_mfdataset(fname,chunks={"time":-1})[["lr13","qmean01","Umean06","s06","bdsd"]])
+			env_ds.append(xr.open_mfdataset(fname,chunks={"time":-1})[var])
 		env = xr.concat(env_ds,dim="time")
 
 		#Slice to times where we have wind gust output, using the closest 6-hourly time for each 10-minute time step
@@ -96,6 +97,9 @@ if __name__ == "__main__":
 
 		#Spatially interpolate the BARPA-R data to the BARPAC grid
 		cluster["bdsd"] = cluster["bdsd"].interp({"lat":f.latitude,"lon":f.longitude},method="nearest").persist()
+		cluster["convgust_dry"] = env["convgust_dry"].interp({"lat":f.latitude,"lon":f.longitude},method="nearest").persist()
+		cluster["gustex"] = env["gustex"].interp({"lat":f.latitude,"lon":f.longitude},method="nearest").persist()
+		cluster["wg10"] = env["wg10"].interp({"lat":f.latitude,"lon":f.longitude},method="nearest").persist()
 		cluster["cluster"] = cluster["cluster"].interp({"lat":f.latitude,"lon":f.longitude},method="nearest").persist()
 
 		#Select 10-minute times from the environmental data (rounding to nearest 6-hourly time step)
@@ -104,6 +108,9 @@ if __name__ == "__main__":
 
 		#Add environmental data to the gust dataset
 		f["bdsd"] = cluster["bdsd"]
+		f["convgust_dry"] = cluster["convgust_dry"]
+		f["gustex"] = cluster["gustex"]
+		f["wg10"] = cluster["wg10"]
 		f["cluster"] = cluster["cluster"]
 
 		#Now calculate the daily maximum gust, and keep the wgr + environmental info for those gusts.
@@ -111,12 +118,18 @@ if __name__ == "__main__":
 
 		dmax_wgr = []
 		dmax_bdsd = []
+		dmax_convgust_dry = []
+		dmax_gustex = []
+		dmax_wg10 = []
 		dmax_cluster = []
 		times = []
 		for name, group in f.groupby("time.date"):
 		    times.append(name)
 		    dmax_wgr.append(xr.where(group.max_wndgust10m == group.max_wndgust10m.max("time"),group.wgr,np.nan).max("time"))
 		    dmax_bdsd.append(xr.where(group.max_wndgust10m == group.max_wndgust10m.max("time"),group.bdsd,np.nan).max("time"))
+		    dmax_convgust_dry.append(xr.where(group.max_wndgust10m == group.max_wndgust10m.max("time"),group.convgust_dry,np.nan).max("time"))
+		    dmax_gustex.append(xr.where(group.max_wndgust10m == group.max_wndgust10m.max("time"),group.gustex,np.nan).max("time"))
+		    dmax_wg10.append(xr.where(group.max_wndgust10m == group.max_wndgust10m.max("time"),group.wg10,np.nan).max("time"))
 		    dmax_cluster.append(xr.where(group.max_wndgust10m == group.max_wndgust10m.max("time"),group.cluster,np.nan).max("time"))    
 		    
 		dmax_wgr = xr.concat(dmax_wgr,"date").persist()
@@ -124,6 +137,15 @@ if __name__ == "__main__":
 
 		dmax_bdsd = xr.concat(dmax_bdsd,"date").persist()
 		dmax_bdsd["date"] = times
+
+		dmax_convgust_dry = xr.concat(dmax_convgust_dry,"date").persist()
+		dmax_convgust_dry["date"] = times
+
+		dmax_gustex = xr.concat(dmax_gustex,"date").persist()
+		dmax_gustex["date"] = times
+
+		dmax_wg10 = xr.concat(dmax_wg10,"date").persist()
+		dmax_wg10["date"] = times
 
 		dmax_cluster = xr.concat(dmax_cluster,"date").persist()
 		dmax_cluster["date"] = times
@@ -141,7 +163,9 @@ if __name__ == "__main__":
 
 		#Combine into one Dataset
 		#ds=xr.Dataset({"wgr_dmax":dmax_wgr,"gust_dmax":dmax_gust,"lightning":l["n_lightning_fl"],"bdsd":dmax_bdsd,"cluster":dmax_cluster})
-		ds=xr.Dataset({"wgr_dmax":dmax_wgr,"gust_dmax":dmax_gust,"bdsd":dmax_bdsd,"cluster":dmax_cluster,"bdsd_dmax":dmax_bdsd_all})
+		ds=xr.Dataset({"wgr_dmax":dmax_wgr,"gust_dmax":dmax_gust,"bdsd":dmax_bdsd,\
+				"convgust_dry":dmax_convgust_dry,"gustex":dmax_gustex,"wg10":dmax_wg10,\
+				"cluster":dmax_cluster,"bdsd_dmax":dmax_bdsd_all})
 
 		#Resample lightning strokes to a 100*100 km grid box
 		#dx_km = 2.2
@@ -165,6 +189,9 @@ if __name__ == "__main__":
 			"wgr_dmax":{"zlib": True, "complevel": 9, "least_significant_digit":3},
 			"gust_dmax":{"zlib": True, "complevel": 9, "least_significant_digit":3},
 			"bdsd":{"zlib": True, "complevel": 9, "least_significant_digit":3},
+			"convgust_dry":{"zlib": True, "complevel": 9, "least_significant_digit":3},
+			"gustex":{"zlib": True, "complevel": 9, "least_significant_digit":3},
+			"wg10":{"zlib": True, "complevel": 9, "least_significant_digit":3},
 			"cluster":{"dtype":int,"zlib": True, "complevel": 9, "_FillValue":-1}})
 			#"lightning100":{"zlib": True, "complevel": 9, "least_significant_digit":0}})
 

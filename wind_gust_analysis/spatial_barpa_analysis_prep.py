@@ -192,6 +192,24 @@ if __name__ == "__main__":
 	max_hist = get_max_gust(barpac_hist, wg_thresh, wgr_thresh, interp_lon, interp_lat)
 	max_rcp = get_max_gust(barpac_rcp, wg_thresh, wgr_thresh, interp_lon, interp_lat)
 
+	#Get BDSD + SCW events
+	dim=("lat","lon","date")
+	scws_bdsd_hist = xr.Dataset({
+		"cluster0":(dim, ((scws_hist.cluster0_events) * (barpar_hist.cluster0_bdsd)).values ),
+		"cluster1":(dim, ((scws_hist.cluster1_events) * (barpar_hist.cluster1_bdsd)).values ),
+		"cluster2":(dim, ((scws_hist.cluster2_events) * (barpar_hist.cluster2_bdsd)).values ),
+		"clusterall":(dim, ((scws_hist.all_events) * (barpar_hist.clusterall_bdsd)).values ),
+	    },
+	    coords={"lat":(("lat"), scws_hist.lat.values), "lon":(("lon"), scws_hist.lon.values), "date":(scws_hist.date.values)}) 
+	scws_bdsd_rcp = xr.Dataset({
+		"cluster0":(dim, ((scws_rcp.cluster0_events) * (barpar_rcp.cluster0_bdsd)).values ),
+		"cluster1":(dim, ((scws_rcp.cluster1_events) * (barpar_rcp.cluster1_bdsd)).values ),
+		"cluster2":(dim, ((scws_rcp.cluster2_events) * (barpar_rcp.cluster2_bdsd)).values ),
+		"clusterall":(dim, ((scws_rcp.all_events) * (barpar_rcp.clusterall_bdsd)).values ),
+	    },
+	    coords={"lat":(("lat"), scws_rcp.lat.values), "lon":(("lon"), scws_rcp.lon.values), "date":(scws_rcp.date.values)}) 
+	
+
 	#Now we have daily, on BARPA-R grid, for each cluster:
 	# -> BDSD occurrences from BARPA-R
 	# -> SCW occurrences
@@ -202,6 +220,8 @@ if __name__ == "__main__":
 	scws_rcp_monthly = monthly_resample(scws_rcp, "sum")
 	max_hist_monthly = monthly_resample(max_hist, "max")
 	max_rcp_monthly = monthly_resample(max_rcp, "max")
+	scws_bdsd_hist_monthly = monthly_resample(scws_bdsd_hist, "sum")
+	scws_bdsd_rcp_monthly = monthly_resample(scws_bdsd_rcp, "sum")
 	barpar_hist_monthly = monthly_resample(barpar_hist, "sum")
 	barpar_rcp_monthly = monthly_resample(barpar_rcp, "sum")
 	
@@ -210,6 +230,8 @@ if __name__ == "__main__":
 	scws_rcp_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpac_scws_rcp_monthly.nc")
 	max_hist_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpac_max_hist_monthly.nc")
 	max_rcp_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpac_max_rcp_monthly.nc")
+	scws_bdsd_hist_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpac_scws_bdsd_hist_monthly.nc")
+	scws_bdsd_rcp_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpac_scws_bdsd_rcp_monthly.nc")
 	barpar_hist_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpar_hist_monthly.nc")
 	barpar_rcp_monthly.to_netcdf("/g/data/eg3/ab4502/ExtremeWind/aus/barpa_access/barpar_rcp_monthly.nc")
 	
