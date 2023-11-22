@@ -7,7 +7,7 @@
 #PBS -o /home/548/ab4502/working/ExtremeWind/jobs/messages/barpa_spatial_scw_access_hist.o
 #PBS -e /home/548/ab4502/working/ExtremeWind/jobs/messages/barpa_spatial_scw_access_hist.e
 #PBS -l storage=gdata/eg3+gdata/tp28+gdata/hh5+gdata/cj37+gdata/rt52+scratch/tp28+gdata/ub4+scratch/eg3
-#PBS -l jobfs=16GB
+#PBS -l jobfs=32GB
 
 module use /g/data/hh5/public/modules
 module load conda/analysis3

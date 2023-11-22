@@ -16,12 +16,37 @@ d=2000-01-01
 #Specify end date
 while [ "$d" != 2005-01-01 ]; do
 
-  start_time=$(date -d "$d" +%Y%m%d)"00"
-  end_time=$(date -d "$d + 1 month - 1 day"  +%Y%m%d)"18"
-  echo "INFO: RUNNING WRFPYTHON ON DATA FROM" $start_time "to" $end_time
-  python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment era --ens r0 --issave True --outname barpa_erai --params min
+  #start_time=$(date -d "$d" +%Y%m%d)"00"
+  #end_time=$(date -d "$d + 1 month - 1 day"  +%Y%m%d)"18"
+  #echo "INFO: RUNNING WRFPYTHON ON DATA FROM" $start_time "to" $end_time
+  #python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment era --ens r0 --issave True --outname barpa_erai --params min
+  #python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment cmip5 --ens r1i1p1 --issave True --outname barpa_access --params min --barpa_forcing_mdl ACCESS1-0
 
   #Advance date
+  #d=$(date -I -d "$d + 1 month")
+
+  #start_time=$(date -d "$d" +%Y01%d)"00"
+  #end_time=$(date -d "$d + 1 month - 1 day"  +%Y01%d)"18"
+  #echo "INFO: RUNNING WRFPYTHON ON DATA FROM" $start_time "to" $end_time
+  #python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment cmip5 --ens r1i1p1 --issave True --outname barpa_access_append --params min --barpa_forcing_mdl ACCESS1-0  
+  d=$(date -I -d "$d + 1 month")
+
+  #start_time=$(date -d "$d" +%Y02%d)"00"
+  #end_time=$(date -d "$d + 1 month - 1 day"  +%Y02%d)"18"
+  #echo "INFO: RUNNING WRFPYTHON ON DATA FROM" $start_time "to" $end_time
+  #python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment cmip5 --ens r1i1p1 --issave True --outname barpa_access_append --params min --barpa_forcing_mdl ACCESS1-0  
+  d=$(date -I -d "$d + 1 month")
+
+  start_time=$(date -d "$d" +%Y03%d)"00"
+  end_time=$(date -d "$d + 1 month - 1 day"  +%Y03%d)"18"
+  echo "INFO: RUNNING WRFPYTHON ON DATA FROM" $start_time "to" $end_time
+  python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment cmip5 --ens r1i1p1 --issave True --outname barpa_access_append --params min --barpa_forcing_mdl ACCESS1-0  
+  d=$(date -I -d "$d + 9 month")
+
+  #start_time=$(date -d "$d" +%Y12%d)"00"
+  #end_time=$(date -d "$d + 1 month - 1 day"  +%Y12%d)"18"
+  #echo "INFO: RUNNING WRFPYTHON ON DATA FROM" $start_time "to" $end_time
+  #python /home/548/ab4502/working/ExtremeWind/wrf_non_parallel.py -m barpa -r aus -t1 $start_time -t2 $end_time -e historical -barpa_experiment cmip5 --ens r1i1p1 --issave True --outname barpa_access_append --params min --barpa_forcing_mdl ACCESS1-0  
   d=$(date -I -d "$d + 1 month")
 
 done
