@@ -1,6 +1,8 @@
 # Log
 
-This directory comprises a workflow as follows. This generates data used for manuscript figures, outlined below. The manuscript focuses on severe convective wind representation in the BARPA model, and future climate projections based on a convection-allowing configuration of the model, compared with a regional configuration.
+This directory comprises a workflow as follows. This generates data used for manuscript figures, outlined below. 
+
+The manuscript has been submitted to Natural Hazards and Earth System Science, and is titled [Convection-permitting climate model representation of severe convective wind gusts and future changes in southeastern Australia](https://doi.org/10.5194/egusphere-2024-322)
 
 ## Generate data
 1) **Large-scale environmental diagnostics relavant for convection** are computed using data the regional BARPA configuration (BARPA-R) and the ERA5 reanalysis. The generic code for this computation is in [wrf_non_parallel.py](https://github.com/andrewbrown31/SCW-analysis/blob/master/wrf_non_parallel.py) within [this repository](https://github.com/andrewbrown31/SCW-analysis/tree/master), and is driven for BARPA by the code in the [`../barpa_wrfpython/`](https://github.com/andrewbrown31/BARPA/tree/main/barpa_wrfpython) and [`../barpa_access_wrfpython/`](https://github.com/andrewbrown31/BARPA/tree/main/barpa_access_wrfpython) directories. The two different BARPA directories represent runs forced by ERA-Interim and ACCESS1-0, respectively. For ERA5, the code is driven from a different repository ([`SCW-analysis/jobs/era5_wrfpython/`](https://github.com/andrewbrown31/SCW-analysis/tree/master/jobs/era5_wrfpython)). Note that we also used [`append_barpa_access_diagnostics.py`](append_barpa_access_diagnostics.py) to update some earlier BARPA diagnostic files.
